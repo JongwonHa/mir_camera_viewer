@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>MiR250 카메라 뷰어</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: white;
+        }
+        
+        h1 { text-align: center; margin-bottom: 10px; }
+        
+        .status-bar {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+        }
+        
+        .status-dot {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-dot.connected { background: #00ff88; }
+        .status-dot.disconnected { background: #ff4444; }
+        
+        .camera-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 15px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .camera-box {
+            background: #0f0f23;
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+        }
+        
+        .camera-box h3 {
+            color: #4CAF50;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+        
+        .camera-box img {
+            width: 100%;
+            border-radius: 8px;
+            background: #000;
+            min-height: 180px;
+            display: block;
+        }
+        
+        .camera-box .no-image {
+            width: 100%;
+            min-height: 180px;
+            background: #000;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        button {
+            padding: 10px 25px;
+            margin: 5px;
+            font-size: 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background: #4CAF50;
+            color: white;
+        }
+        button:hover { background: #45a049; }
+        button.secondary { background: #2196F3; }
+        
+        .info { 
+            text-align: center;
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: #888;
+        }
+        
+        .debug-link {
+            display: block;
+            text-align: center;
+            margin-top: 10px;
+            color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <h1>🤖 MiR250 카메라 뷰어</h1>
+    
+    <div class="status-bar">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">확인 중...</span>
+        <span id="msgCount" style="margin-left: 20px; color: #888;"></span>
+    </div>
+    
+    <div class="controls">
+        <button onclick="refreshImages()">🔄 새로고침</button>
+        <button class="secondary" onclick="window.open('/debug', '_blank')">🔧 디버그</button>
+    </div>
+    
+    <div class="camera-grid">
+        <div class="camera-box">
+            <h3>📷 왼쪽 적외선 (Infra1)</h3>
+            <img id="img_left_infra" src="/snapshot/left_infra" 
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                 onload="this.style.display='block'; this.nextElementSibling.style.display='none';">
+            <div class="no-image">이미지 없음</div>
+        </div>
+        
+        <div class="camera-box">
+            <h3>📷 오른쪽 적외선 (Infra1)</h3>
+            <img id="img_right_infra" src="/snapshot/right_infra"
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                 onload="this.style.display='block'; this.nextElementSibling.style.display='none';">
+            <div class="no-image">이미지 없음</div>
+        </div>
+        
+        
+    <div class="info">
+        로봇 IP: {{ robot_ip }} | ROS Bridge: ws://{{ robot_ip }}:9090
+    </div>
+    
+    <a href="/debug" class="debug-link">디버그 페이지 열기</a>
+
+    <script>
+        function refreshImages() {
+            const timestamp = new Date().getTime();
+            const cameras = ['left_infra', 'right_infra', 'left_depth', 'right_depth'];
+            cameras.forEach(cam => {
+                const img = document.getElementById('img_' + cam);
+                img.src = '/snapshot/' + cam + '?' + timestamp;
+            });
+        }
+        
+        function checkStatus() {
+            fetch('/status')
+                .then(r => r.json())
+                .then(data => {
+                    const dot = document.getElementById('statusDot');
+                    const text = document.getElementById('statusText');
+                    const count = document.getElementById('msgCount');
+                    
+                    dot.className = 'status-dot ' + (data.connected ? 'connected' : 'disconnected');
+                    text.textContent = data.connected ? '연결됨 ✅' : '연결 안됨 ❌';
+                    count.textContent = '메시지: ' + data.message_count;
+                    
+                    // 이미지 있으면 자동 새로고침
+                    if (Object.values(data.images_available).some(v => v)) {
+                        refreshImages();
+                    }
+                });
+        }
+        
+        checkStatus();
+        setInterval(checkStatus, 2000);
+        setInterval(refreshImages, 3000);
+    </script>
+</body>
+</html>
